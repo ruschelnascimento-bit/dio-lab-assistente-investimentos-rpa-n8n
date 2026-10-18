@@ -1,0 +1,471 @@
+{
+  "name": "DIO_Investimento_com_IA",
+  "nodes": [
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        816,
+        0
+      ],
+      "id": "7143e2ac-fc20-4e8c-9e70-ef21cdeddbaf",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -784,
+        -144
+      ],
+      "id": "eb504d6d-305c-4ac8-aba7-68d54b6ecf2f",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "content": "Hospedagem - Extração (RPA)",
+        "height": 416,
+        "width": 592,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1424,
+        -224
+      ],
+      "typeVersion": 1,
+      "id": "ee1f4fad-8ed9-48c0-a69a-1b20ee0bfc95",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt_cliente }}",
+        "options": {
+          "systemMessage": "=Você é um especialista em investimentos amigável e profissional. Reescreva a mensagem de e-mail a seguir criando recomendações mais inteligentes e humanizadas seguindo rigorosamente estas regras:\n- Idioma: {{ $('Recomendação').item.json.copy_rules.idioma }}\n- Tom: {{ $('Recomendação').item.json.copy_rules.tom }}\n- Tamanho: {{ $('Recomendação').item.json.copy_rules.tamanho }}\n- Evitar: {{ $('Recomendação').item.json.copy_rules.evitar.join(', ') }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -48,
+        -144
+      ],
+      "id": "5a4e52f4-4ead-4b26-b437-10055f432f2f",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatNvidia",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        64
+      ],
+      "id": "685a91de-78c7-4897-8ee1-fb7dd3574094",
+      "name": "NVIDIA Nemotron Chat Model",
+      "credentials": {
+        "nvidiaApi": {
+          "id": "VKTZL7K0P0rboD5x",
+          "name": "NVIDIA Nemotron account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "725ed6c2-fd0f-406c-8804-3b1e4d853787",
+              "leftValue": "={{ $json.email_to }}",
+              "rightValue": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        464,
+        -144
+      ],
+      "id": "94f51fc0-8ed0-45d5-b53e-6207919589d5",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email_to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.mensagem_html }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        -192
+      ],
+      "id": "9f9fb5b3-7275-4c8b-9025-abdfa01d5b02",
+      "name": "Envio e-mails",
+      "webhookId": "d3bab56a-ba8a-46b8-8415-987b82cfee18",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Zlp1B6BgkdIJWS34",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://digitalinnovationone.github.io/dio-lab-assistente-investimentos-rpa-n8n/data.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -1184,
+        0
+      ],
+      "id": "1ffd58f2-4986-4861-a419-09c8d021258d",
+      "name": "Investimentos"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega o CSV bruto como texto vindo do nó anterior\nconst csvRaw = $json.data ?? $json.body ?? $json;\nconst text = (typeof csvRaw === \"string\") ? csvRaw : JSON.stringify(csvRaw);\n\n// Quebra as linhas e remove vazias\nconst lines = text.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean);\nif (lines.length === 0) return [{ json: { investimentos: [] } }];\n\n// Função auxiliar para parsear CSV respeitando aspas (vírgulas dentro de campos)\nconst parseCSVLine = (line) => {\n  const result = [];\n  let current = '';\n  let inQuotes = false;\n  \n  for (let i = 0; i < line.length; i++) {\n    const char = line[i];\n    if (char === '\"') {\n      inQuotes = !inQuotes;\n    } else if (char === ',' && !inQuotes) {\n      result.push(current.trim());\n      current = '';\n    } else {\n      current += char;\n    }\n  }\n  result.push(current.trim());\n  return result.map(val => val.replace(/^\"|\"$/g, '')); // Remove aspas nas pontas\n};\n\n// Extrai os cabeçalhos\nconst headers = parseCSVLine(lines[0]);\n\n// Processa as linhas de dados\nconst investimentos = lines.slice(1).map(line => {\n  const cols = parseCSVLine(line);\n  const obj = {};\n  \n  headers.forEach((h, i) => {\n    obj[h] = cols[i] ?? \"\";\n  });\n\n  // Normaliza o campo 'minimo' para número de forma segura (suportando decimais com ponto ou vírgula)\n  if (obj.minimo !== undefined) {\n    let cleanVal = String(obj.minimo).replace(/\\s/g, \"\").replace(\",\", \".\");\n    cleanVal = cleanVal.replace(/[^\\d.]/g, \"\");\n    obj.minimo = Number(cleanVal) || 0;\n  }\n\n  return obj;\n});\n\nreturn [{ json: { investimentos } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -976,
+        0
+      ],
+      "id": "7fe3f703-9f6f-488a-875e-9c324570ecee",
+      "name": "Organiza Regras Investimento"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "clientes",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -1376,
+        -160
+      ],
+      "id": "765e6386-8912-406b-b144-b449ca5b955a",
+      "name": "Cliente + RPA",
+      "webhookId": "495e00ae-8272-469e-baf1-a74c6f74f6df"
+    },
+    {
+      "parameters": {
+        "content": "Orquestração",
+        "height": 416,
+        "width": 736
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -832,
+        -224
+      ],
+      "typeVersion": 1,
+      "id": "7e77b9af-7b95-44e3-9f67-141f0b6162f6",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "Geração com IA",
+        "height": 416,
+        "width": 512,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -96,
+        -224
+      ],
+      "typeVersion": 1,
+      "id": "2684e2bd-f544-4f0a-af84-bd355193c5a1",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "Validação",
+        "height": 416,
+        "width": 192,
+        "color": "#40D44A"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        416,
+        -224
+      ],
+      "typeVersion": 1,
+      "id": "c7aa9596-7565-4921-942a-f3870a0b65d3",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "Saída\n",
+        "height": 416,
+        "width": 352,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        608,
+        -224
+      ],
+      "typeVersion": 1,
+      "id": "03a19f0a-0c01-4d89-8a98-1f52dd59a8ee",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Função auxiliar para converter o saldo em string (\"R$ 28.900,00\") para número puro (28900)\nfunction parseSaldo(saldoStr) {\n  if (typeof saldoStr === 'number') return saldoStr;\n  if (!saldoStr) return 0;\n  const cleanStr = String(saldoStr)\n    .replace(/[^\\d,-]/g, '') // Remove R$, espaços e pontos de milhar\n    .replace(',', '.');       // Substitui vírgula decimal por ponto\n  return parseFloat(cleanStr) || 0;\n}\n\n// 1. Recupera a lista de clientes (vinda do Webhook) e a lista de investimentos (vinda do CSV)\nconst mergedData = $input.all();\n\n// No nó Merge, a entrada 0 geralmente traz os clientes e a entrada 1 os investimentos\n// ou ambos vêm no mesmo item dependendo da configuração. Vamos extrair com segurança:\nconst clientes = mergedData[0]?.json?.clientes ?? mergedData[0]?.json?.body?.clientes ?? [];\nconst investimentos = mergedData[0]?.json?.investimentos ?? mergedData[1]?.json?.investimentos ?? [];\n\n// Array para armazenar o resultado final formatado para envio\nconst resultados = [];\n\n// 2. Itera sobre cada cliente para encontrar as melhores opções\nfor (const cliente of clientes) {\n  const saldoNum = parseSaldo(cliente.saldo);\n\n  // Filtra os investimentos compatíveis com o perfil do cliente e com o saldo mínimo\n  const recomendacoes = investimentos.filter(inv => {\n    const mesmoPerfil = inv.perfil?.toLowerCase() === cliente.perfil?.toLowerCase();\n    const cabeNoBolso = inv.minimo <= saldoNum;\n    return mesmoPerfil && cabeNoBolso;\n  });\n\n  // 3. Monta o corpo da mensagem / e-mail\n  let textoInvestimentos = '';\n  if (recomendacoes.length > 0) {\n    textoInvestimentos = recomendacoes.map(inv => \n      `- ${inv.produto}: Aplicação mínima de R$ ${inv.minimo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Rentabilidade: ${inv.rentabilidade})`\n    ).join('\\n');\n  } else {\n    textoInvestimentos = '- No momento, não encontramos opções de investimento com o aporte mínimo disponível para o seu saldo atual.';\n  }\n\n  const mensagemEmail = `Olá, ${cliente.nome}!\\n\\n` +\n    `Analisamos que o seu perfil de investidor é considerado '${cliente.perfil}' e o saldo disponível em sua conta é de ${cliente.saldo}.\\n\\n` +\n    `Com base nas suas características, selecionamos as seguintes opções de investimento recomendadas para você:\\n\\n` +\n    `${textoInvestimentos}\\n\\n` +\n    `Se você tiver alguma dúvida, nossa equipe está à disposição para ajudar!\\n\\n` +\n    `Atenciosamente,\\n` +\n    `Equipe de Investimentos DIO`;\n\n  resultados.push({\n    json: {\n      cliente: cliente.nome,\n      email: cliente.email,\n      perfil: cliente.perfil,\n      saldo: cliente.saldo,\n      saldoNumerico: saldoNum,\n      qtdOpcoesEncontradas: recomendacoes.length,\n      opcoesInvestimento: recomendacoes,\n      assuntoEmail: `Sugestão de Investimentos para o seu perfil ${cliente.perfil}`,\n      corpoEmail: mensagemEmail\n    }\n  });\n}\n\nreturn resultados;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        -144
+      ],
+      "id": "d772db58-772d-4692-be0a-4903fe4b68cb",
+      "name": "Cruzar dados"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Obtém todos os itens que chegam do nó anterior no n8n\nconst items = $input.all();\n\nlet resultados = [];\n\nif (items.length > 0) {\n  const firstJson = items[0].json;\n  if (firstJson.resultados && Array.isArray(firstJson.resultados)) {\n    resultados = firstJson.resultados;\n  } else if (Array.isArray(firstJson)) {\n    resultados = firstJson;\n  } else {\n    resultados = items.map(item => item.json);\n  }\n}\n\n// Processa e normaliza mapeando exatamente os nomes que o nó anterior envia\nconst out = resultados.map(c => {\n  const nomeCliente = c.cliente || c.nome || \"Cliente\";\n  const emailCliente = c.email || c.email_to || \"\";\n  const perfilCliente = c.perfil || \"Não informado\";\n  const saldoTexto = c.saldo || \"R$ 0,00\";\n  const saldoNum = c.saldoNumerico !== undefined ? Number(c.saldoNumerico) : 0;\n  \n  // Monta a recomendação com base nas opções encontradas ou no corpo do email\n  let recomendacaoStr = \"\";\n  if (Array.isArray(c.opcoesInvestimento) && c.opcoesInvestimento.length > 0) {\n    recomendacaoStr = c.opcoesInvestimento.map(inv => `${inv.produto} (${inv.rentabilidade})`).join(\", \");\n  } else {\n    recomendacaoStr = \"Sem opções compatíveis no momento\";\n  }\n\n  const mensagemBase = c.corpoEmail || c.mensagem_base || `Olá, ${nomeCliente}! Analisamos seu perfil ${perfilCliente}.`;\n\n  return {\n    json: {\n      email_to: String(emailCliente).trim().toLowerCase(),\n      nome: String(nomeCliente).trim(),\n      perfil: perfilCliente,\n      saldo_texto: saldoTexto,\n      saldo_num: saldoNum,\n      recomendacao: recomendacaoStr,\n      motivo: `Perfil compatível com saldo de ${saldoTexto}`,\n      mensagem_base: String(mensagemBase).trim(),\n      copy_rules: {\n        idioma: \"pt-BR\",\n        tom: \"amigável e profissional\",\n        tamanho: \"curto (4-6 linhas)\",\n        evitar: [\"promessas de ganho\", \"garantias\", \"linguagem agressiva\"]\n      }\n    }\n  };\n});\n\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        -144
+      ],
+      "id": "c27a406c-dfe0-4c14-b8e9-e67dbe55063f",
+      "name": "Recomendação",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  return {\n    json: {\n      prompt_cliente: `Cliente: ${item.json.nome || item.json.cliente || ''}\\n\\nMensagem base:\\n${item.json.mensagem_base || item.json.mensagemBase || ''}`\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        -144
+      ],
+      "id": "4f5aa5ae-5da2-4094-8ec0-40c76c998aa2",
+      "name": "Mapeamento IA"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega os resultados processados pelo AI Agent na entrada atual\nconst aiOutputs = $input.all();\n\n// Pega os dados originais dos clientes do nó de processamento anterior\nconst originalClients = $('Recomendação').all();\n\nreturn aiOutputs.map((item, index) => {\n  const originalData = originalClients[index]?.json || {};\n  const textoIA = item.json.output || '';\n\n  // Extrai a primeira linha (saudação) para pegar o nome ou usa o original\n  const emailTo = originalData.email_to || originalData.email || '';\n  const nomeCliente = originalData.nome || originalData.cliente || 'Cliente';\n  const perfil = originalData.perfil || '';\n\n  // Define um assunto personalizado para o e-mail\n  const assunto = `Sugestão de Investimentos - Perfil ${perfil || 'Personalizado'}`;\n\n  // Converte o Markdown leve da IA (**bold**) para tags HTML ou limpa para texto puro\n  const corpoEmailHtml = textoIA\n    .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')\n    .replace(/\\n/g, '<br>');\n\n  return {\n    json: {\n      email_to: emailTo,\n      subject: assunto,\n      cliente_nome: nomeCliente,\n      perfil: perfil,\n      mensagem_raw: textoIA,\n      mensagem_html: corpoEmailHtml\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        -144
+      ],
+      "id": "d058d8e1-dd78-42f2-bfe0-2c57bd55e2cc",
+      "name": "Mensagem IA"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Cruzar dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NVIDIA Nemotron Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Mensagem IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Envio e-mails",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envio e-mails": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Investimentos": {
+      "main": [
+        [
+          {
+            "node": "Organiza Regras Investimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Organiza Regras Investimento": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Cliente + RPA": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Investimentos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cruzar dados": {
+      "main": [
+        [
+          {
+            "node": "Recomendação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recomendação": {
+      "main": [
+        [
+          {
+            "node": "Mapeamento IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mapeamento IA": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensagem IA": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "33ee4a68-c831-492e-9b27-4b4db3395680",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ea19a317571552740cece5a74eb8c0d82611d1fab02c2be3a1a0ef9383985557"
+  },
+  "nodeGroups": [],
+  "id": "FZyvcNfYpwBuvsHH",
+  "tags": []
+}
